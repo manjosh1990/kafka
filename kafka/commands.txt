@@ -1,0 +1,34 @@
+docker compose -f docker-compose.yml up -d
+
+docker images
+
+docker ps
+
+docker exec -it kafka bash
+
+cd /opt/kafka/bin
+
+kafka commands:
+
+#create topic
+kafka-topics.sh --create --zookeeper zookeeper:2181 --replication-factor 1 --partitions 1 --topic quickstart
+
+#list topics
+kafka-topics.sh --list --zookeeper zookeeper:2181
+
+#produce topics
+kafka-console-producer.sh --topic quickstart --bootstrap-server localhost:9092
+
+#check messages in topic
+kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic quickstart --from-beginning
+
+#describe topic
+kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic kafka-new-topic
+
+
+#delete topic
+kafka-topics.sh --zookeeper zookeeper:2181 --delete --topic quickstart
+
+
+#list consumers
+kafka-consumer-groups.sh  --list --bootstrap-server localhost:9092
