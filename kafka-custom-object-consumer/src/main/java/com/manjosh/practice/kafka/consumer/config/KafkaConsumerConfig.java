@@ -1,16 +1,24 @@
 package com.manjosh.practice.kafka.consumer.config;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.manjosh.kafkaproducer.filteringMessages.CarLocation;
 import com.manjosh.practice.kafka.consumer.model.Animal;
 import com.manjosh.practice.kafka.consumer.model.Customer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.kafka.ConcurrentKafkaListenerContainerFactoryConfigurer;
+import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.listener.adapter.RecordFilterStrategy;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 
 import java.util.HashMap;
@@ -25,6 +33,12 @@ public class KafkaConsumerConfig {
     @Value("${group.id}")
     private String groupId;
 
+    @Autowired
+    private KafkaProperties kafkaProperties;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @Bean
     public ConsumerFactory<String, String> consumerFactory()
     {
@@ -34,6 +48,7 @@ public class KafkaConsumerConfig {
         config.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        config.put(ConsumerConfig.METADATA_MAX_AGE_CONFIG, "120000");
         // Returning message in JSON format
         return new DefaultKafkaConsumerFactory<>(config, new StringDeserializer(), new StringDeserializer());
     }
@@ -70,4 +85,28 @@ public class KafkaConsumerConfig {
         factory.setConsumerFactory(consumerFactory2());
         return factory;
     }
+
+
+    //kafka consumer config for filtering messages
+    @Bean
+    public ConsumerFactory<Object, Object> consumerFactoryObject() {
+        var properties = kafkaProperties.buildConsumerProperties(null);
+        properties.put(ConsumerConfig.METADATA_MAX_AGE_CONFIG, "120000");
+        return new DefaultKafkaConsumerFactory<>(properties);
+    }
+    @Bean(name = "farLocationContainerFactory")
+    public ConcurrentKafkaListenerContainerFactory<Object, Object> farLocationContainerFactory(ConcurrentKafkaListenerContainerFactoryConfigurer configurer) {
+        var factory = new ConcurrentKafkaListenerContainerFactory<>();
+        configurer.configure(factory, consumerFactoryObject());
+        factory.setRecordFilterStrategy(consumerRecord -> {
+            try {
+                CarLocation carLocation = objectMapper.readValue(consumerRecord.value().toString(), CarLocation.class);
+                return carLocation.getDistance() <= 100;
+            } catch (JsonProcessingException e) {
+                return false;
+            }
+        });
+        return factory;
+    }
+
 }
